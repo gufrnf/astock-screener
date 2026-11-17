@@ -7,8 +7,38 @@
 - `index.html`：交互式网页助手，调总资金和风险参数即可实时生成分配方案、图表与 CSV（**助手软件**）。
 
 - `ths_source.py`：同花顺行情数据源（历史日K + 当日实时），可作东方财富之外的第二数据源。
+- `backtest.py`：策略回测引擎（**回测好不好**）——移植 GitHub 量化工具的事件驱动回测与绩效体系，验证信号的历史有效性。
 
 有 Python 3 就能跑，不需要 `pip install` 任何东西。在线助手：https://gufrnf.github.io/astock-screener/ ｜ 研报：https://gufrnf.github.io/astock-screener/report.html
+
+## 移植 GitHub 量化工具的功能
+
+检索 GitHub 高星量化项目，把其中最有价值的三块能力**用标准库重新实现**并接入本工具链（不引入第三方依赖）：
+
+| GitHub 项目 | Stars | 移植的功能 | 落地位置 |
+|---|---|---|---|
+| `microsoft/qlib` | 50k | AI 量化平台的因子/评估理念 | 多因子横截面打分 `screen.py` |
+| `vnpy/vnpy` | 46k | 量化平台的策略-风控-回测框架思想 | 整体架构 |
+| `TA-Lib/ta-lib-python` | 12k | 技术指标 **CCI / 威廉%R / BIAS / OBV** | `backtest.py` 的 `expanded_indicators()` |
+| `polakowo/vectorbt` | 9.9k | 向量化回测 + 绩效指标（夏普/回撤/胜率） | `backtest.py` 的 `_metrics()` |
+| `kernc/backtesting.py` | 9.2k | **事件驱动回测**（T日信号/T+1成交/交易成本） | `backtest.py` 的 `run_backtest()` |
+| `PyPortfolio/PyPortfolioOpt` | 6.2k | 组合层风险度量（波动率/回撤/夏普） | `backtest.py` 的 `portfolio_backtest()` |
+
+### 回测引擎用法
+
+```bash
+python backtest.py                                  # 默认观察池组合回测（基础信号）
+python backtest.py -c 002409 601211                 # 指定股票
+python backtest.py --source ths -c 601211           # 同花顺数据源
+python backtest.py -c 002409 --json                 # JSON（供前端/推送使用）
+```
+
+回测规则：**T 日收盘计算信号，T+1 开盘价成交**，含佣金万 2.5 + 卖出印花税千 1，A 股 100 股/手取整。
+绩效指标：累计/年化收益、最大回撤、夏普、卡玛、胜率、盈亏比、年化波动率。
+
+网页助手「策略回测」板块可一键切换**基础信号 / 叠加 TA-Lib 增强**两套结果对照。
+一个诚实的发现：本样本里基础信号组合（+6.7%，夏普 0.47）反而优于叠加 TA-Lib 后的增强信号（-1.8%，夏普 0.05）——
+**指标更多不等于更准**，这是量化研究里典型的过拟合陷阱，两套结果如实呈现供对照。
 
 ## 双数据源：东方财富 / 同花顺
 
