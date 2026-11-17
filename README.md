@@ -1,10 +1,12 @@
-# A 股多策略智能选股器 + 择时买卖点提醒
+# A 股投资助手 · 选股 / 择时 / 资金分配
 
-一个**零第三方依赖**的命令行工具集：只用 Python 标准库，调用东方财富公开行情接口。
+一个**零第三方依赖**的工具集 + 交互式网页助手：命令行只用 Python 标准库，调用东方财富公开行情接口。
 - `screen.py`：对全 A 股做多因子横截面打分，输出候选清单（**选什么**）。
 - `trade_signals.py`：对候选股拉历史 K 线，算均线/MACD/RSI/KDJ/布林/量能，给出「何时入 / 何时出」信号（**何时买卖**）。
+- `allocator.py`：用风险预算法把买卖信号转成可执行的资金分配方案——买多少股/多少金额/占多少仓位（**买多少**）。
+- `index.html`：交互式网页助手，调总资金和风险参数即可实时生成分配方案、图表与 CSV（**助手软件**）。
 
-有 Python 3 就能跑，不需要 `pip install` 任何东西。在线研报：https://gufrnf.github.io/astock-screener/
+有 Python 3 就能跑，不需要 `pip install` 任何东西。在线助手：https://gufrnf.github.io/astock-screener/ ｜ 研报：https://gufrnf.github.io/astock-screener/report.html
 
 > ⚠️ **免责声明**：本工具输出仅为基于公开数据的量化筛选结果，仅供研究参考，**不构成任何投资建议**。市场有风险，投资需谨慎。
 
@@ -93,9 +95,41 @@ req = urllib.request.Request(DINGTALK_WEBHOOK,
 urllib.request.urlopen(req)
 ```
 
-## 在线研报
+## 资金分配（allocator.py）+ 助手软件
 
-`index.html` 是发布在 GitHub Pages 上的可视化研报：GitHub 量化工具检索清单 + 择时信号体系 + 当日真实买卖点 + 全市场选股结果。本地可直接双击打开。
+采用**风险预算法（固定分数风险）**：先定每笔最多亏总资金的比例（如 1%），再用 `风险预算 ÷ (入场价−止损价)` 反推可买股数，按 A股 100 股/手向下取整，并受单股仓位上限、组合总仓位上限约束。信号越强（评分越高）风险预算系数越大（最多 1.3x）。只给买入信号分配资金。
+
+```bash
+python allocator.py                              # 读 watch 信号，10万资金，默认参数
+python allocator.py --capital 500000             # 50万资金
+python allocator.py --risk 0.02 --max-total 0.9  # 单笔风险2%，总仓位上限90%
+python allocator.py --source all --json          # 用全市场Top15信号，JSON输出
+```
+
+| 参数 | 默认 | 含义 |
+|---|---|---|
+| `--capital` | 100000 | 总资金（元）|
+| `--risk` | 0.01 | 单笔风险比例，每笔最多亏总资金 1% |
+| `--max-single` | 0.20 | 单股仓位上限 20% |
+| `--max-total` | 0.80 | 组合总仓位上限 80%，其余留现金 |
+
+输出每只股票的入场/止损/目标、建议手数与股数、金额、仓位%、最大亏损、盈亏比；并汇总组合总风险敞口（若全部触发止损的合计亏损）。**只给买点信号分配，卖点/观望不分配。**
+
+### 交互式助手软件（index.html）
+
+发布在 GitHub Pages 上的单页应用，本地双击也能开：
+- 左侧调「总资金 / 单笔风险 / 单股上限 / 总仓位上限」，右侧**实时**生成分配方案
+- 汇总卡片 + 分配明细表 + 资金分布饼图 + 仓位/盈亏比柱状图
+- 一键导出 CSV、参数自动保存在本机浏览器
+- 「当日信号」区展示所有观察标的的择时信号
+- 前端分配算法与 `allocator.py` 完全一致（已逐项对照验证）
+
+> 完整工作流：`trade_signals.py --json > signals_watch.json`（刷新信号）→ `allocator.py`（命令行方案）/ 打开网页（交互方案）。
+
+## 在线页面
+
+- 助手软件（首页）：https://gufrnf.github.io/astock-screener/
+- 量化工具研报：https://gufrnf.github.io/astock-screener/report.html
 
 ## 风险提示
 
