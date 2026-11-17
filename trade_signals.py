@@ -415,9 +415,11 @@ def print_report(results, elapsed):
     print("  免责声明：技术分析有滞后性与假信号，本结果不构成投资建议，据此操作风险自负。")
 
 
-def build_json(results):
+def build_json(results, source="eastmoney"):
     return {
         "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "source": "ths" if source == "ths" else "eastmoney",
+        "source_cn": "同花顺" if source == "ths" else "东方财富",
         "data_date": results[0]["signal"]["last_date"] if results else "",
         "count": len(results),
         "legend": {
@@ -440,9 +442,20 @@ def main():
     ap.add_argument("-c", "--codes", nargs="+", help="指定股票代码，跳过选股直接看买卖点")
     ap.add_argument("-s", "--strategy", choices=["all", "value", "growth", "dividend"], default="all")
     ap.add_argument("--limit", type=int, default=1200, help="选股时拉取股票数量上限")
+    ap.add_argument("--source", choices=["eastmoney", "ths"], default="eastmoney",
+                    help="K线数据源：eastmoney 东方财富（默认）/ ths 同花顺")
     ap.add_argument("--json", action="store_true", help="JSON 输出")
     ap.add_argument("--summary", action="store_true", help="仅输出信号分布统计")
     args = ap.parse_args()
+
+    # 同花顺数据源按需加载（零依赖，本地模块）
+    ths_fetch = None
+    if args.source == "ths":
+        try:
+            from ths_source import fetch_kline_ths as ths_fetch
+        except ImportError:
+            print("错误：未找到 ths_source.py，请把该文件放在同目录", file=sys.stderr)
+            sys.exit(1)
 
     t0 = time.time()
 
@@ -457,10 +470,14 @@ def main():
         print(f"      有效 {len(clean)} 只，按[{args.strategy}]打分选 Top{args.top}...", file=sys.stderr)
         targets = preselect(clean, args.strategy, args.top)
 
-    print(f"[2/2] 逐只拉取日K线并计算买卖点信号（共{len(targets)}只）...", file=sys.stderr)
+    src_cn = "同花顺" if args.source == "ths" else "东方财富"
+    print(f"[2/2] 逐只拉取日K线并计算买卖点信号（共{len(targets)}只，数据源：{src_cn}）...", file=sys.stderr)
     results = []
     for idx, t in enumerate(targets, 1):
-        name, ks = fetch_kline(t["code"])
+        if ths_fetch:
+            name, ks = ths_fetch(t["code"], days=120)
+        else:
+            name, ks = fetch_kline(t["code"])
         if not ks:
             print(f"      [{idx}/{len(targets)}] {t['code']} K线获取失败，跳过", file=sys.stderr)
             continue
@@ -478,7 +495,7 @@ def main():
     elapsed = time.time() - t0
 
     if args.json:
-        print(json.dumps(build_json(results), ensure_ascii=False, indent=2))
+        print(json.dumps(build_json(results, args.source), ensure_ascii=False, indent=2))
     elif args.summary:
         cnt = {}
         for r in results:
