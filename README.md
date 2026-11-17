@@ -6,7 +6,24 @@
 - `allocator.py`：用风险预算法把买卖信号转成可执行的资金分配方案——买多少股/多少金额/占多少仓位（**买多少**）。
 - `index.html`：交互式网页助手，调总资金和风险参数即可实时生成分配方案、图表与 CSV（**助手软件**）。
 
+- `ths_source.py`：同花顺行情数据源（历史日K + 当日实时），可作东方财富之外的第二数据源。
+
 有 Python 3 就能跑，不需要 `pip install` 任何东西。在线助手：https://gufrnf.github.io/astock-screener/ ｜ 研报：https://gufrnf.github.io/astock-screener/report.html
+
+## 双数据源：东方财富 / 同花顺
+
+`trade_signals.py` 支持两套 K 线数据源，用 `--source` 切换：
+
+```bash
+python trade_signals.py -c 002409 601211                    # 东方财富（默认）
+python trade_signals.py --source ths -c 002409 601211       # 同花顺
+python trade_signals.py --source ths -s all -n 15 --json > signals_ths.json
+```
+
+- **东方财富**：`push2his.eastmoney.com`，前复权，接口稳定。
+- **同花顺**：`d.10jqka.com.cn` 的 `last.js`（近140日历史）+ `today.js`（当日实时盘中价），不复权。模块 `ths_source.py` 可单独使用：`python ths_source.py 002409`。
+
+两套数据源的信号方向通常一致，可交叉验证；价格略有差异（同花顺含当日实时、东财为最近交易日）。网页助手顶部可一键切换数据源查看两套信号。
 
 > ⚠️ **免责声明**：本工具输出仅为基于公开数据的量化筛选结果，仅供研究参考，**不构成任何投资建议**。市场有风险，投资需谨慎。
 
@@ -104,11 +121,14 @@ python allocator.py                              # 读 watch 信号，10万资�
 python allocator.py --capital 500000             # 50万资金
 python allocator.py --risk 0.02 --max-total 0.9  # 单笔风险2%，总仓位上限90%
 python allocator.py --source all --json          # 用全市场Top15信号，JSON输出
+python allocator.py --capital 5000 --source ths  # 5千小额资金 + 同花顺信号
 ```
+
+> **小额资金**：总资金可低至 100 元、按 100 元递增。由于 A股按 100 股/手整手买入，资金过低时高价股（如股价 500 元需 5 万/手）会自动跳过；若按风险预算算出的股数不足 1 手也不分配。网页助手在资金低于 2 万时会给出相应提示。
 
 | 参数 | 默认 | 含义 |
 |---|---|---|
-| `--capital` | 100000 | 总资金（元）|
+| `--capital` | 100000 | 总资金（元），**可低至 100，按 100 元为单位取整** |
 | `--risk` | 0.01 | 单笔风险比例，每笔最多亏总资金 1% |
 | `--max-single` | 0.20 | 单股仓位上限 20% |
 | `--max-total` | 0.80 | 组合总仓位上限 80%，其余留现金 |
