@@ -37,10 +37,18 @@ from datetime import datetime
 LOT = 100  # A股 1 手 = 100 股（科创板规则不同，此处保守统一按100股）
 
 
+def isFinite(x):
+    try:
+        return math.isfinite(float(x))
+    except (TypeError, ValueError):
+        return False
+
+
 def load_signals(source):
     """读取信号 JSON，统一返回 results 列表。"""
     base = os.path.dirname(os.path.abspath(__file__))
-    fn = "signals_watch.json" if source == "watch" else "signals_data.json"
+    fn = {"watch": "signals_watch.json", "ths": "signals_ths.json",
+          "all": "signals_data.json"}.get(source, "signals_watch.json")
     path = os.path.join(base, fn)
     if not os.path.exists(path):
         return [], ""
@@ -185,16 +193,22 @@ def print_report(plans, summary, data_date):
 
 def main():
     ap = argparse.ArgumentParser(description="资金分配引擎（风险预算法）")
-    ap.add_argument("--capital", type=float, default=100000, help="总资金，默认 10万")
+    ap.add_argument("--capital", type=float, default=100000,
+                    help="总资金（元），可低至 100，按 100 取整，默认 10万")
     ap.add_argument("--risk", type=float, default=0.01, help="单笔风险比例，默认 0.01（1%%）")
     ap.add_argument("--max-single", type=float, default=0.20, help="单股仓位上限，默认 0.20（20%%）")
     ap.add_argument("--max-total", type=float, default=0.80, help="组合总仓位上限，默认 0.80（80%%）")
-    ap.add_argument("--source", choices=["watch", "all"], default="watch", help="信号来源")
+    ap.add_argument("--source", choices=["watch", "ths", "all"], default="watch",
+                    help="信号来源：watch 东财观察池/ ths 同花顺/ all 全市场Top15")
     ap.add_argument("--json", action="store_true", help="JSON 输出")
     a = ap.parse_args()
 
+    # 资金：下限 100，按 100 元为单位取整
+    capital = a.capital if (isFinite(a.capital) and a.capital >= 100) else 100
+    capital = round(capital / 100) * 100
+
     signals, data_date = load_signals(a.source)
-    plans, summary = allocate(signals, a.capital, a.risk, a.max_single, a.max_total)
+    plans, summary = allocate(signals, capital, a.risk, a.max_single, a.max_total)
 
     if a.json:
         print(json.dumps({
