@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>A 股市场简解与选股思路 · 2026-11-17</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<style>
+  :root{
+    --up:#d3322a; --down:#1a9c62; --ink:#1b1f27; --sub:#5b6472; --line:#e3e7ee;
+    --bg:#f4f6f9; --card:#ffffff; --accent:#2b5cff; --accent-bg:#eef3ff;
+    --warn-bg:#fff8e8; --warn-bd:#f0c860;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.7;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1040px;margin:0 auto;padding:36px 24px 60px}
+  .eyebrow{font-size:12px;letter-spacing:2px;color:var(--accent);font-weight:700;text-transform:uppercase}
+  h1{font-size:30px;line-height:1.35;margin:8px 0 6px;letter-spacing:-.5px}
+  .meta{font-size:13px;color:var(--sub);margin-bottom:26px}
+  .meta b{color:var(--ink)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;
+    padding:24px 26px;margin-bottom:18px;box-shadow:0 2px 14px rgba(20,30,60,.04)}
+  h2{font-size:19px;margin-bottom:14px;padding-left:12px;border-left:4px solid var(--accent);line-height:1.3}
+  h3{font-size:15px;margin:18px 0 8px;color:var(--ink)}
+  p{font-size:14px;color:#333b47;margin:8px 0}
+  .tldr{background:linear-gradient(135deg,#eef3ff,#f6f2ff);border:1px solid #dbe4ff}
+  .verdict{display:flex;flex-wrap:wrap;gap:10px;margin:14px 0 6px}
+  .chip{background:#fff;border:1px solid #dbe4ff;border-radius:20px;padding:6px 14px;font-size:13px;font-weight:600}
+  .chip b{color:var(--accent)}
+  .lead{font-size:15px;font-weight:600;color:#1b2340;background:#fff;border-radius:10px;padding:14px 16px;border:1px solid #e3e9ff}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:6px 0 4px}
+  .kpi .box{background:#fafbfe;border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+  .kpi .box .v{font-size:22px;font-weight:800;line-height:1.2}
+  .kpi .box .l{font-size:11px;color:var(--sub);margin-top:3px}
+  .up{color:var(--up)!important}.down{color:var(--down)!important}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+  th,td{padding:9px 10px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+  th{background:#f7f9fc;color:var(--sub);font-weight:600;font-size:12px}
+  th:first-child,td:first-child{text-align:left}
+  td.name{text-align:left;font-weight:600}
+  .chart{width:100%;height:320px}
+  .src{font-size:11px;color:#8a93a3;margin-top:8px;line-height:1.6}
+  .chain{display:flex;align-items:stretch;gap:8px;flex-wrap:wrap;margin:14px 0}
+  .chain .node{background:#f7f9fc;border:1px solid var(--line);border-radius:10px;padding:11px 14px;flex:1;min-width:120px;font-size:13px}
+  .chain .node b{display:block;color:var(--accent);font-size:12px;margin-bottom:3px}
+  .chain .arr{align-self:center;color:var(--accent);font-weight:800;font-size:18px}
+  .tag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:6px;margin-left:6px;font-weight:600;vertical-align:middle}
+  .tag.buy{background:#fdeceb;color:var(--up)}
+  .tag.watch{background:#eef3ff;color:var(--accent)}
+  .tag.def{background:#e8f7f0;color:var(--down)}
+  .cond{background:#fafbfe;border-left:3px solid var(--accent);padding:10px 14px;margin:8px 0;font-size:13px;border-radius:0 8px 8px 0}
+  .cond b{color:var(--accent)}
+  .warn{background:var(--warn-bg);border:1px solid var(--warn-bd);border-radius:10px;padding:14px 16px;font-size:13px;margin-top:12px}
+  .warn b{color:#a8760a}
+  .disc{background:#f0f2f5;border-radius:10px;padding:16px 18px;font-size:12px;color:#5b6472;line-height:1.8;margin-top:20px}
+  code{background:#eef1f6;padding:1px 6px;border-radius:5px;font-size:12px;color:#2b3a67}
+  pre{background:#1e2430;color:#d7e0f0;border-radius:10px;padding:14px 16px;font-size:12.5px;overflow-x:auto;margin:10px 0;line-height:1.6}
+  .two-col-list{columns:2;column-gap:28px;font-size:13px}
+  .two-col-list li{margin-bottom:5px}
+  @media(max-width:760px){.grid,.kpi{grid-template-columns:1fr 1fr}.two-col-list{columns:1}h1{font-size:24px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="eyebrow">Market Brief · 量化选股</div>
+  <h1>A 股市场简解与选股思路</h1>
+  <div class="meta">
+    数据基准：<b>2026-11-17 午间休市</b>（部分资金/估值数据截至 11-16）　|　
+    数据来源：<b>NeoData 行情 · 东方财富 · 券商研报（11月）</b>　|　
+    生成时间：2026-11-17
+  </div>
+
+  <!-- 首屏结论 -->
+  <div class="card tldr">
+    <h2>30 秒结论</h2>
+    <div class="verdict">
+      <span class="chip">市场档位 <b>震荡 · 二次探底</b></span>
+      <span class="chip">行情性质 <b>超跌反抽，非反转</b></span>
+      <span class="chip">主线 <b>半导体国产链</b></span>
+      <span class="chip">核心观察 <b>量能能否破 2 万亿</b></span>
+    </div>
+    <div class="lead">
+      市场在 3600 点附近震荡筑底并二次探底：11-17 上午先大幅低开、随后基本收复，呈现
+      「权重托底 + 资金集中买半导体国产链 + 中小盘普涨」的结构性修复。但成交额持续萎缩、
+      主力中期净流出，指数中期仍处下行通道——这是典型的<b>超跌反弹 + 存量博弈</b>，
+      不是趋势反转。策略上宜<b>控制总仓位、精选结构、做短不做长</b>，而非全面进攻。
+    </div>
+    <div class="src">来源：NeoData 大盘市场宽度统计（2026-11-17）、格隆汇/东方财富午评（2026-11-17）；券商观点见文末来源。</div>
+  </div>
+
+  <!-- 指数概览 -->
+  <div class="card">
+    <h2>一、市场全景：普涨，但指数没涨</h2>
+    <div class="kpi">
+      <div class="box"><div class="v">3602.07</div><div class="l">上证指数 <span class="down">-0.01%</span></div></div>
+      <div class="box"><div class="v up">+3.31%</div><div class="l">科创50（领涨）</div></div>
+      <div class="box"><div class="v up">3546 / 1789</div><div class="l">上涨 / 下跌家数</div></div>
+      <div class="box"><div class="v">8946 亿</div><div class="l">半日成交（缩量）</div></div>
+    </div>
+    <p>当日结构极度分化：<b class="up">科创50 +3.31%、中证500 +1.24%、北证50 +2.44%</b>，而
+       上证50 <b class="down">-0.18%</b>、沪深300 几乎持平。上涨家数占比 63%，涨停 42 家、跌停 25 家，
+       是「个股普涨、指数不涨」的典型结构。涨停集中在光刻胶、电子化学品、光学光电子的中小盘；
+       跌停集中在上周高位的人气股（影视院线、传媒）——资金正从娱乐应用端撤向上游设备材料端。</p>
+    <div id="chartIdx" class="chart"></div>
+    <div class="src">来源：westock-data 指数行情、NeoData 板块涨跌排行（2026-11-17 午间）。红涨绿跌。</div>
+  </div>
+
+  <!-- 中期趋势 -->
+  <div class="card">
+    <h2>二、指数健康度：反弹之下，中期趋势仍弱</h2>
+    <p>把时间拉长看，当日反弹并不能改变中期弱势。创业板指近 20 日 <b class="down">-14.69%</b>、
+       近 60 日 <b class="down">-27.05%</b>、年初至今 <b class="down">-37.52%</b>，
+       11 月 12–16 日三个交易日出现急跌（11-16 单日 -4.37%）。11-17 属于急跌后的反抽。
+       广度恶化常先于指数回落——这里要警惕「指数还在涨但结构已经脆弱」。</p>
+    <div id="chartTrend" class="chart"></div>
+    <div class="src">来源：westock-data 日 K 线（近 20 交易日），截至 2026-11-17 午间。阶段涨跌幅口径。</div>
+  </div>
+
+  <div class="grid">
+    <!-- 资金 -->
+    <div class="card">
+      <h2>三、资金：钱往哪里去</h2>
+      <div id="chartFlow" class="chart" style="height:280px"></div>
+      <p style="font-size:13px">全市场主力净流出约 132.5 亿，但<b class="up">科创50 主力净流入 27.03 亿</b>
+         （近 10 日 +73.5 亿），是唯一持续获主力净流入的宽基。个股层面有研新材净买入 11.73 亿居首。</p>
+      <div class="src">来源：westock-data 资金流向（2026-11-17）。</div>
+    </div>
+    <!-- 估值分位 -->
+    <div class="card">
+      <h2>四、估值：极冷与极热并存</h2>
+      <p style="font-size:13px">板块 PB 历史分位呈现罕见的两极分化——这决定了不同主线的「性价比」含义完全不同。</p>
+      <h3>半导体设备 PB 分位</h3>
+      <div style="background:#eef1f6;border-radius:8px;height:22px;position:relative">
+        <div style="background:linear-gradient(90deg,#f5a3a0,var(--up));height:100%;width:96.27%;border-radius:8px"></div>
+        <span style="position:absolute;right:10px;top:1px;font-size:12px;font-weight:700;color:#fff">96.3% 极高</span>
+      </div>
+      <h3>券商 PB 分位</h3>
+      <div style="background:#eef1f6;border-radius:8px;height:22px;position:relative">
+        <div style="background:linear-gradient(90deg,#9fe0c2,var(--down));height:100%;width:5.67%;min-width:34px;border-radius:8px"></div>
+        <span style="position:absolute;left:42px;top:1px;font-size:12px;font-weight:700;color:var(--down)">5.7% 极低</span>
+      </div>
+      <p style="font-size:13px;margin-top:12px">上证 PE 16.4x、沪深300 13.4x、上证50 11.75x，处于近三年中位数附近；
+         券商板块 PE 5 年分位仅 1.98%、PB 5 年分位 0.66%，股息率处 5 年 99.75% 分位——典型左侧。</p>
+      <div class="src">来源：westock-data 板块估值 pt01850818 / pt01801193（2026-11-16），分位为各自报告截面口径。</div>
+    </div>
+  </div>
+
+  <!-- 传导链 -->
+  <div class="card">
+    <h2>五、主线传导：为什么是半导体设备材料</h2>
+    <p>外围费城半导体指数隔夜重挫逾 5%，A股资金却没跟随抛售芯片，而是加仓国产设备与封测——
+       外围利空反过来强化了国产替代逻辑。传导链条如下：</p>
+    <div class="chain">
+      <div class="node"><b>上游驱动</b>AI 算力放量 + 长鑫/长存扩产</div>
+      <div class="arr">→</div>
+      <div class="node"><b>中间变量</b>晶圆厂新增产线设备采购</div>
+      <div class="arr">→</div>
+      <div class="node"><b>产业验证</b>国产化率 35%→40%，招标口径 55%</div>
+      <div class="arr">→</div>
+      <div class="node"><b>受益环节</b>设备/材料/零部件（刻蚀65%、薄膜61%、清洗63%）</div>
+    </div>
+    <p style="font-size:13px">可验证的订单数据：盛美上海在手订单 170.73 亿（同比 +88.2%）、
+       中微公司 2026 新签订单体量与增速创历史新高。SEMI 预测 2026 全球半导体设备销售额 1659 亿美元、同比 +23.2%。</p>
+    <div class="warn"><b>传导时滞与瓶颈：</b>量检测国产化率不足 10%、光刻仅 1%–2%，是继续爬坡的主要瓶颈；
+       零部件供应紧张压制短期交付。板块 PB 已在 96% 分位，任何资本开支或涨价斜率放缓都可能快速杀估值——
+       这是交易性主题，不宜当作无脑中期持有。</div>
+    <div class="src">来源：东方财富《芯片扩产潮驱动国产化率快速攀升》(2026-11-12)、三个皮匠报告国产化率专题(2026-11-09)，均为研报/媒体口径，需核实原文。</div>
+  </div>
+
+  <!-- 候选股票 -->
+  <div class="card">
+    <h2>六、可关注标的：三条主线，三种"性价比"</h2>
+    <p>前提声明：以下不是无条件的买入指令，而是<b>按不同风险偏好分层、附带触发条件与风险</b>的观察清单。
+       请先对照你自己的风险承受能力、资金期限与仓位，再决定是否、以及如何参与。</p>
+
+    <h3>主线 A · 半导体国产链 <span class="tag buy">进取型 · 右侧跟随</span></h3>
+    <p style="font-size:13px">板块整体估值高，只在个股层面找「相对低估 × 资金持续流入」。</p>
+    <table>
+      <thead><tr><th>标的</th><th>现价</th><th>PE(TTM)</th><th>PB</th><th>当日</th><th>10日主力</th><th>看点</th></tr></thead>
+      <tbody>
+        <tr><td class="name">雅克科技 002409</td><td>85.98</td><td>39.4x</td><td>4.81</td><td class="up">+8.42%</td><td class="up">+2.14亿</td><td>板块内 PE 最低之一，前驱体平台</td></tr>
+        <tr><td class="name">江丰电子 300666</td><td>214.99</td><td>65.2x</td><td>7.82</td><td class="up">+8.42%</td><td class="up">+7.47亿</td><td>20日主力 +8.27亿最高，净利 +102%</td></tr>
+        <tr><td class="name">中微公司 688012</td><td>245.51</td><td>46.7x</td><td>7.49</td><td class="up">+5.28%</td><td class="up">+29.46亿</td><td>刻蚀龙头，净利 +241%</td></tr>
+        <tr><td class="name">拓荆科技 688072</td><td>513.00</td><td>53.5x</td><td>10.85</td><td class="up">+6.16%</td><td class="up">+13.48亿</td><td>薄膜沉积，Q3 净利 +336.8%</td></tr>
+      </tbody>
+    </table>
+    <div class="cond"><b>触发条件：</b>板块涨停封板次日能延续 + 量能回到 2 万亿上方，才确认是主线而非反抽；
+      <b>风险：</b>PB 96% 分位，追高易吃估值压缩；单日大涨后不宜盲目追涨停。</div>
+
+    <h3>主线 B · 低估值券商 <span class="tag watch">均衡型 · 左侧布局</span></h3>
+    <p style="font-size:13px">PB 5.67% 分位 + 4%–6% 股息，构成安全边际；但「便宜」不等于「马上涨」。</p>
+    <table>
+      <thead><tr><th>标的</th><th>现价</th><th>PE</th><th>PB</th><th>股息率</th><th>5日主力</th><th>看点</th></tr></thead>
+      <tbody>
+        <tr><td class="name">国泰海通 601211</td><td>16.18</td><td>9.29x</td><td>0.87</td><td>4.00%</td><td class="up">+1.06亿</td><td>总资产行业第一，资金转正</td></tr>
+        <tr><td class="name">国信证券 002736</td><td>9.13</td><td>11.1x</td><td>0.96</td><td class="up">6.02%</td><td class="up">+0.13亿</td><td>股息率板块最高</td></tr>
+        <tr><td class="name">华泰证券 601688</td><td>17.16</td><td>8.29x</td><td>0.86</td><td>3.38%</td><td class="down">-2.51亿</td><td>PE 最低梯队，出海领先</td></tr>
+        <tr><td class="name">国元证券 000728</td><td>6.67</td><td>11.7x</td><td>0.74</td><td>3.00%</td><td class="up">+0.20亿</td><td>PB 全板块最低，资金正流入</td></tr>
+      </tbody>
+    </table>
+    <div class="cond"><b>触发条件：</b>成交额企稳回升 / 并购重组落地 / 中长期资金入市——需要催化，不是靠估值自身。
+      <b>风险：</b>公募仍在减配（持仓 0.31%，低配 2.9pct），Q3 单季利润已同比 -17%；估值修复有较长时滞。</div>
+
+    <h3>主线 C · 红利防御 <span class="tag def">稳健型 · 底仓防守</span></h3>
+    <p style="font-size:13px">权重红利股处高位且资金流出，这里的「性价比」是股息率与估值的匹配度，不是股价便宜。</p>
+    <table>
+      <thead><tr><th>标的</th><th>现价</th><th>PE</th><th>PB</th><th>股息率</th><th>20日主力</th><th>看点</th></tr></thead>
+      <tbody>
+        <tr><td class="name">格力电器 000651</td><td>40.31</td><td>9.10x</td><td>1.50</td><td class="up">7.43%</td><td class="down">-5.97亿</td><td>股息率最高，5日逆势吸筹</td></tr>
+        <tr><td class="name">工商银行 601398</td><td>8.95</td><td>8.30x</td><td>0.80</td><td>3.58%</td><td class="up">+10.31亿</td><td>三档资金全净流入，最抗跌</td></tr>
+        <tr><td class="name">中国平安 601318</td><td>54.27</td><td>9.97x</td><td>0.94</td><td>5.03%</td><td class="up">+13.80亿</td><td>5%股息 + 资金流入</td></tr>
+        <tr><td class="name">兴业银行 601166</td><td>19.94</td><td>5.62x</td><td>0.50</td><td>5.35%</td><td class="up">+0.35亿</td><td>PE/PB 双低，估值极值</td></tr>
+      </tbody>
+    </table>
+    <div class="cond"><b>适合：</b>稳健型作为底仓防守，赚股息与波动的钱。<b>风险：</b>高位红利股短期资金流出，
+      下行保护并非绝对；一旦市场转向进攻，红利可能跑输。</div>
+
+    <div class="warn"><b>反向声音（务必读）：</b>随附的量化程序按动量打分时，今天会把「N菊乐 +75%」「怡达股份 +20%」这类
+      新股/涨停股排在前列——这正是纯量化的危险：它区分不了「低位启动」和「情绪顶部」，不会自动规避追高。
+      工具给的是横截面相对排序，<b>不是买入信号</b>。基本面、政策与你自己对风险的判断，仍要排在打分之前。</div>
+
+    <div class="src">来源：westock-data 个股行情/估值/资金流（2026-11-17），finance 三季报（2026Q3）；
+      半导体产业数据来自东方财富/三个皮匠报告（2026-11），研报观点来自招商证券(11-01)、华泰证券(11-16)、经济参考报(11-05)等，均为非一手来源，需核实原文。</div>
+  </div>
+
+  <!-- 程序 -->
+  <div class="card">
+    <h2>七、自动选股程序（随附，可直接运行）</h2>
+    <p>仓库内 <code>screen.py</code> 是一个<b>零第三方依赖</b>的命令行选股器：只用 Python 标准库，
+       调用东方财富公开行情接口，对全 A 股做风控过滤 + 多因子 z-score 打分。有 Python 3 即可运行。</p>
+    <pre>python screen.py                       # 综合打分 Top20
+python screen.py -s value   -n 15        # 低估值蓝筹
+python screen.py -s growth  -n 20        # 高景气动量
+python screen.py -s dividend             # 红利防御
+python screen.py -s value --json         # JSON 输出（可接其他系统）</pre>
+    <p style="font-size:13px">打分因子：估值（PE/PB 倒数）、动量（涨跌幅）、量能（量比）、资金（主力净占比）、
+       流动性（成交额对数）；不同策略用不同权重。程序已内置剔除亏损/ST/市值与价格越界的风控。</p>
+    <p style="font-size:13px">本地试运行（2026-11-17 11:41 行情，1201 只有效候选）中，低估值策略筛出的前列为
+       民生银行、青农商行、贵阳银行、华夏银行、中国建筑等——与上文研报独立得出的「银行/建筑低估值」判断相互印证，
+       说明程序逻辑可用。</p>
+  </div>
+
+  <!-- 观察清单 -->
+  <div class="card">
+    <h2>八、后续观察清单</h2>
+    <ul class="two-col-list">
+      <li>量能能否回到 <b>2 万亿</b>以上（反弹是反抽还是反转的最直接信号）</li>
+      <li>半导体设备/材料涨停封板次日能否延续</li>
+      <li>两融余额（已连续 2 日下降）与宽基 ETF 申赎是否持续承接</li>
+      <li>12 月美联储加息路径、美债收益率与海外 AI 产业链情绪</li>
+      <li>券商并购重组落地与中长期资金入市进度</li>
+      <li>产业资本回购增持（11-16 晚多家公司公告）能否扩散</li>
+    </ul>
+  </div>
+
+  <div class="disc">
+    <b>免责声明</b>：以上内容基于公开数据和量化分析，仅供参考，不构成投资建议。市场有风险，投资需谨慎。
+    任何投资决策应结合个人风险承受能力、资金状况和投资目标独立判断，必要时咨询持牌专业机构。过往表现不预示未来收益。
+  </div>
+
+</div>
+
+<script>
+(function(){
+  var up = '#d3322a', down = '#1a9c62', accent = '#2b5cff';
+  function barColor(v){ return v >= 0 ? up : down; }
+
+  // 图1：主要指数当日涨跌幅
+  var idxName = ['科创50','北证50','中证500','创业板指','深证成指','沪深300','上证指数','上证50'];
+  var idxVal  = [3.31, 2.44, 1.24, 0.72, 0.69, 0.05, -0.01, -0.18];
+  echarts.init(document.getElementById('chartIdx')).setOption({
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, valueFormatter: function(v){ return v + '%'; } },
+    grid: { left: 80, right: 40, top: 16, bottom: 30 },
+    xAxis: { type: 'value', axisLabel: { formatter: '{value}%' }, splitLine: { lineStyle: { color: '#eef1f6' } } },
+    yAxis: { type: 'category', data: idxName.slice().reverse(), axisLabel: { fontSize: 12 }, axisTick: { show: false } },
+    series: [{
+      type: 'bar',
+      data: idxVal.slice().reverse().map(function(v){ return { value: v, itemStyle: { color: barColor(v), borderRadius: 3 } }; }),
+      label: { show: true, position: 'right', formatter: function(p){ return (p.value>0?'+':'') + p.value + '%'; }, fontSize: 11 },
+      barWidth: '55%'
+    }]
+  });
+
+  // 图2：宽基指数阶段涨跌幅
+  echarts.init(document.getElementById('chartTrend')).setOption({
+    tooltip: { trigger: 'axis', valueFormatter: function(v){ return v + '%'; } },
+    legend: { data: ['上证指数','深证成指','创业板指'], top: 0, textStyle: { fontSize: 12 } },
+    grid: { left: 55, right: 24, top: 40, bottom: 30 },
+    xAxis: { type: 'category', data: ['当日','近5日','近20日','近60日','年初至今'], axisLabel: { fontSize: 12 } },
+    yAxis: { type: 'value', axisLabel: { formatter: '{value}%' }, splitLine: { lineStyle: { color: '#eef1f6' } } },
+    series: [
+      { name: '上证指数', type: 'bar', data: [-0.01,-1.68,-3.57,-9.56,-9.24], itemStyle: { color: '#7b8cff', borderRadius: [3,3,0,0] } },
+      { name: '深证成指', type: 'bar', data: [0.69,-4.24,-8.78,-20.41,-26.79], itemStyle: { color: '#4f6bff', borderRadius: [3,3,0,0] } },
+      { name: '创业板指', type: 'bar', data: [0.72,-6.32,-14.69,-27.05,-37.52], itemStyle: { color: '#b06bff', borderRadius: [3,3,0,0] } }
+    ]
+  });
+
+  // 图3：主力资金净流入（亿元）
+  var flowName = ['科创50','上证指数','上证50','创业板指','深证成指'];
+  var flowVal  = [27.03, -4.50, 0, -17.68, -22.34];
+  echarts.init(document.getElementById('chartFlow')).setOption({
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, valueFormatter: function(v){ return v + ' 亿'; } },
+    grid: { left: 70, right: 44, top: 12, bottom: 28 },
+    xAxis: { type: 'value', axisLabel: { formatter: '{value}' }, splitLine: { lineStyle: { color: '#eef1f6' } } },
+    yAxis: { type: 'category', data: flowName.slice().reverse(), axisLabel: { fontSize: 11 }, axisTick: { show: false } },
+    series: [{
+      type: 'bar',
+      data: flowVal.slice().reverse().map(function(v){ return { value: v, itemStyle: { color: barColor(v), borderRadius: 3 } }; }),
+      label: { show: true, position: 'right', formatter: function(p){ return p.value + '亿'; }, fontSize: 11 },
+      barWidth: '50%'
+    }]
+  });
+})();
+</script>
+</body>
+</html>
