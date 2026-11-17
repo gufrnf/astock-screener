@@ -108,11 +108,19 @@
       <!-- 参数面板 -->
       <div>
         <div class="field">
-          <label>总资金（元）</label>
-          <div class="input-row"><input type="number" id="capital" value="100000" min="10000" step="10000"><span class="unit">元</span></div>
+          <label>行情数据源</label>
+          <div class="quick" id="srcQuick" style="margin-top:0">
+            <button data-s="eastmoney" class="sel">东方财富</button>
+            <button data-s="ths">同花顺</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>总资金（元）· 可低至 100 元，按 100 元递增</label>
+          <div class="input-row"><input type="number" id="capital" value="100000" min="100" step="100"><span class="unit">元</span></div>
           <div class="quick" id="capQuick">
-            <button data-v="100000" class="sel">10万</button><button data-v="300000">30万</button>
-            <button data-v="500000">50万</button><button data-v="1000000">100万</button>
+            <button data-v="1000">1千</button><button data-v="3000">3千</button>
+            <button data-v="5000">5千</button><button data-v="10000">1万</button>
+            <button data-v="100000" class="sel">10万</button><button data-v="500000">50万</button>
           </div>
         </div>
         <div class="field">
@@ -141,6 +149,7 @@
       <!-- 结果区 -->
       <div>
         <div class="kpis" id="kpis"></div>
+        <div id="capTip" class="note" style="display:none;margin:0 0 14px"></div>
         <div class="tw"><table id="allocTable">
           <thead><tr><th>代码</th><th>名称</th><th>信号</th><th>评分</th><th>入场</th><th>止损</th><th>目标</th>
             <th>手数</th><th>股数</th><th>金额</th><th>仓位</th><th>最大亏</th><th>盈亏比</th></tr></thead>
@@ -185,8 +194,13 @@ const fmt = v => v>=1e8?(v/1e8).toFixed(2)+'亿':v>=1e4?(v/1e4).toFixed(2)+'万'
 const fmtInt = v => Math.round(v).toLocaleString();
 function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),1800);}
 
-const W = window.WATCH_DATA || {results:[],data_date:''};
-$('dataDate').textContent = W.data_date || '—';
+let W = window.WATCH_DATA || {results:[],data_date:''};
+let DATA_SRC = 'eastmoney';
+function updateSourceLabel(){
+  const cn = DATA_SRC==='ths' ? '同花顺' : '东方财富';
+  $('dataDate').textContent = (W.data_date||'—')+' · '+cn;
+}
+updateSourceLabel();
 let CURRENT_PLAN = null;
 
 // ============ 分配算法（与 allocator.py 一致）============
@@ -232,7 +246,10 @@ function allocate(signals, capital, risk, maxSingle, maxTotal){
 // ============ 渲染 ============
 let charts={};
 function render(){
-  const capital=parseFloat($('capital').value)||100000;
+  // 资金：下限100元，按100元为单位取整
+  let capital=parseFloat($('capital').value);
+  if(!isFinite(capital)||capital<100) capital=100;
+  capital=Math.round(capital/100)*100;
   const risk=parseFloat($('risk').value)/100;
   const maxSingle=parseFloat($('single').value)/100;
   const maxTotal=parseFloat($('total').value)/100;
@@ -251,6 +268,17 @@ function render(){
     <div class="kpi r"><div class="v">${fmt(summary.invested)}</div><div class="l">建议投入 ${summary.invested_pct.toFixed(1)}%</div></div>
     <div class="kpi g"><div class="v">${fmt(summary.cash)}</div><div class="l">保留现金 ${summary.cash_pct.toFixed(1)}%</div></div>
     <div class="kpi y"><div class="v">${summary.total_risk_pct.toFixed(2)}%</div><div class="l">组合最大风险敞口</div></div>`;
+  // 小额资金提示：A股按100股/手，资金过低时高价股买不起一手
+  const tip=$('capTip');
+  if(capital<20000){
+    let skipHigh=(W.results||[]).filter(s=>['buy','strong_buy'].includes(s.action_key||keyOf(s.action))&&(s.entry_ref||s.price)*100>capital).length;
+    tip.style.display='block';
+    tip.innerHTML=`<b>小额资金提示：</b>当前 ${fmt(capital)} 元，A股按 100 股/手整手买入。`+
+      (skipHigh?`有 ${skipHigh} 只买点股一手就超过总资金，已自动跳过。`:'')+
+      ` 若某股按风险预算算出的股数不足 1 手，也不会分配。可提高单笔风险或单股上限以配置更多标的。`;
+  }else{
+    tip.style.display='none';
+  }
 
   // 表
   const tb=$('allocTable').querySelector('tbody');
@@ -319,14 +347,32 @@ function renderSignals(){
       ｜ 现价 ${s.price} ｜ ${(s.reasons||[])[0]||'无显著信号'}</div>`;
     grid.appendChild(d);
   });
-  $('sigSrc').textContent=`共 ${W.results.length} 只观察标的，信号日期 ${W.data_date||'—'}；数据由 trade_signals.py 拉取东方财富公开行情计算。`;
+  const srcName = W.source_cn || (DATA_SRC==='ths'?'同花顺':'东方财富');
+  $('sigSrc').textContent=`共 ${W.results.length} 只观察标的，信号日期 ${W.data_date||'—'}；数据由 trade_signals.py 拉取${srcName}公开行情计算。`;
 }
 
 // ============ 交互 ============
 function bind(){
+  // 资金离开输入框时规范化到 100 的倍数、下限 100
+  $('capital').addEventListener('change',()=>{
+    let v=parseFloat($('capital').value);
+    if(!isFinite(v)||v<100) v=100;
+    $('capital').value=Math.round(v/100)*100;
+    render();
+  });
   ['capital','risk','single','total'].forEach(id=>$(id).addEventListener('input',render));
   $('capQuick').addEventListener('click',e=>{if(e.target.dataset.v){$('capital').value=e.target.dataset.v;render();}});
   $('riskQuick').addEventListener('click',e=>{if(e.target.dataset.v){$('risk').value=e.target.dataset.v;render();}});
+  $('srcQuick').addEventListener('click',e=>{
+    const s=e.target.dataset.s; if(!s) return;
+    DATA_SRC=s;
+    $('srcQuick').querySelectorAll('button').forEach(b=>b.classList.toggle('sel',b.dataset.s===s));
+    W = (s==='ths' && window.THS_DATA) ? window.THS_DATA : window.WATCH_DATA;
+    updateSourceLabel();
+    renderSignals();
+    render();
+    toast('已切换数据源：'+(s==='ths'?'同花顺':'东方财富'));
+  });
   $('calcBtn').addEventListener('click',()=>{render();toast('方案已生成');});
   $('saveBtn').addEventListener('click',()=>{
     try{localStorage.setItem('astock_alloc',JSON.stringify({
