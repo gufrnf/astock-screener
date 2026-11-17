@@ -82,6 +82,16 @@
   .toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(80px);background:#1e293b;color:#fff;
     padding:11px 22px;border-radius:10px;font-size:13px;opacity:0;transition:all .3s;z-index:99;box-shadow:var(--shadow)}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .btbar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px}
+  .btbar .quick{margin-top:0}
+  .btdate{font-size:11.5px;color:var(--sub)}
+  .kpis5{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:16px}
+  @media(max-width:820px){.kpis5{grid-template-columns:repeat(3,1fr)}}
+  .kpi .v.sm{font-size:18px}
+  .btchart{margin-bottom:16px}
+  #btEquity{height:340px}
+  .indtag{display:inline-block;font-size:10.5px;color:var(--sub);background:#f1f5f9;border-radius:5px;padding:1px 6px;margin:1px 2px 1px 0}
+  .indtag.on{color:var(--up);background:#fdecec}
 </style>
 </head>
 <body>
@@ -93,6 +103,7 @@
   <nav class="nav">
     <a href="#alloc" class="active">资金分配</a>
     <a href="#signals">当日信号</a>
+    <a href="#backtest">策略回测</a>
     <a href="report.html">量化工具研报</a>
     <a href="README.md">源码说明</a>
   </nav>
@@ -171,6 +182,24 @@
     <p class="lead">对主线观察池逐只拉 120 日 K 线，用均线/MACD/RSI/KDJ/布林/量能综合打分。只有"买点"信号会进入上方资金分配。</p>
     <div class="sig" id="sigGrid"></div>
     <p class="src" id="sigSrc"></p>
+  </div>
+
+  <!-- 策略回测 -->
+  <div class="card" id="backtest">
+    <h2><span class="num">回</span>策略回测（移植 GitHub 量化工具能力）</h2>
+    <p class="lead">把 backtesting.py 的事件驱动回测、TA-Lib 的扩展指标（CCI / 威廉%R / BIAS / OBV）、绩效指标体系移植进来。
+      T日收盘算信号、T+1开盘成交，含佣金印花税。可切换「基础信号 / 叠加TA-Lib增强」两套结果对照。</p>
+    <div class="btbar">
+      <div class="quick" id="btMode">
+        <button data-m="basic" class="sel">基础信号</button>
+        <button data-m="enhanced">叠加 TA-Lib 增强</button>
+      </div>
+      <span class="btdate" id="btDate"></span>
+    </div>
+    <div class="kpis5" id="btKpis"></div>
+    <div class="btchart"><div id="btEquity" class="chart"></div></div>
+    <div class="tw"><table id="btTable"></table></div>
+    <div class="note" id="btInsight"></div>
   </div>
 
   <!-- 免责 -->
@@ -351,6 +380,76 @@ function renderSignals(){
   $('sigSrc').textContent=`共 ${W.results.length} 只观察标的，信号日期 ${W.data_date||'—'}；数据由 trade_signals.py 拉取${srcName}公开行情计算。`;
 }
 
+// ============ 策略回测 ============
+const BT = window.BACKTEST_DATA || null;
+let BT_MODE = 'basic';
+function renderBacktest(){
+  if(!BT || !BT.basic){ $('btInsight').innerHTML='<b>回测数据未加载</b>：请确认 data.js 含 BACKTEST_DATA。'; return; }
+  const d = BT[BT_MODE];
+  const m = d.portfolio.metrics;
+  const pctCls = v => v>=0?'pos':'neg';
+  const sign = v => (v>0?'+':'')+v;
+
+  // 组合绩效 KPI
+  $('btKpis').innerHTML=`
+    <div class="kpi"><div class="v sm ${pctCls(m.total_return)}">${sign(m.total_return)}%</div><div class="l">组合累计收益</div></div>
+    <div class="kpi"><div class="v sm ${pctCls(m.annual_return)}">${sign(m.annual_return)}%</div><div class="l">年化收益</div></div>
+    <div class="kpi"><div class="v sm" style="color:#0f9960">${m.max_drawdown}%</div><div class="l">最大回撤</div></div>
+    <div class="kpi"><div class="v sm ${m.sharpe>=1?'pos':''}">${m.sharpe}</div><div class="l">夏普比率</div></div>
+    <div class="kpi"><div class="v sm">${m.volatility}%</div><div class="l">年化波动率</div></div>
+    <div class="kpi"><div class="v sm">${d.stocks.length}</div><div class="l">回测标的数</div></div>`;
+  $('btDate').textContent=`生成于 ${d.generated_at||'—'} ｜ 数据源：${d.source_cn||'东方财富'} ｜ ${d.params.days}日历史`;
+
+  // 个股回测表
+  const tb=$('btTable');
+  tb.innerHTML=`<thead><tr><th>代码</th><th>名称</th><th>总收益</th><th>年化</th><th>最大回撤</th><th>夏普</th><th>胜率</th><th>盈亏比</th><th>交易</th><th>扩展指标（TA-Lib）</th></tr></thead><tbody></tbody>`;
+  const body=tb.querySelector('tbody');
+  d.stocks.forEach(s=>{
+    const x=s.metrics, ind=s.indicators||{};
+    const tags=[];
+    if(ind.cci!=null) tags.push(`<span class="indtag">CCI ${ind.cci}</span>`);
+    if(ind.wr!=null) tags.push(`<span class="indtag">%R ${ind.wr}</span>`);
+    if(ind.bias!=null) tags.push(`<span class="indtag ${Math.abs(ind.bias)>5?'on':''}">BIAS ${ind.bias}%</span>`);
+    (ind.reasons||[]).slice(0,2).forEach(r=>tags.push(`<span class="indtag on">${r}</span>`));
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${s.code}</td><td>${s.name}</td>
+      <td class="${pctCls(x.total_return)}"><b>${sign(x.total_return)}%</b></td>
+      <td class="${pctCls(x.annual_return)}">${sign(x.annual_return)}%</td>
+      <td style="color:#0f9960">${x.max_drawdown}%</td>
+      <td class="${x.sharpe>=1?'pos':''}">${x.sharpe}</td>
+      <td>${x.win_rate}%</td><td>${x.profit_factor}</td><td>${x.trades}</td>
+      <td style="text-align:left;white-space:normal;max-width:260px">${tags.join('')||'—'}</td>`;
+    body.appendChild(tr);
+  });
+
+  // 净值曲线：两套信号对照
+  if(window.echarts){
+    charts.bt=charts.bt||echarts.init($('btEquity'));
+    const base=BT.basic.portfolio.equity||[], enh=BT.enhanced.portfolio.equity||[];
+    const startBase=base.length?base[0].equity:0, startEnh=enh.length?enh[0].equity:0;
+    charts.bt.setOption({
+      title:{text:'组合净值走势 · 基础 vs TA-Lib增强（初始10万）',left:'center',textStyle:{fontSize:14,color:'#1f2937'}},
+      tooltip:{trigger:'axis',valueFormatter:v=>v==null?'—':fmt(v)},
+      legend:{data:['基础信号','TA-Lib增强'],bottom:2,textStyle:{color:'#64748b',fontSize:11}},
+      grid:{left:64,right:24,top:44,bottom:46},
+      xAxis:{type:'category',data:base.map(p=>p.date),axisLabel:{color:'#64748b',fontSize:10}},
+      yAxis:{type:'value',scale:true,axisLabel:{color:'#64748b',formatter:v=>(v/1e4).toFixed(0)+'万'},splitLine:{lineStyle:{color:'#eef2f7'}}},
+      series:[
+        {name:'基础信号',type:'line',data:base.map(p=>p.equity),smooth:true,symbol:'none',
+          lineStyle:{width:2.2,color:'#2563eb'},areaStyle:{color:'rgba(37,99,235,.06)'}},
+        {name:'TA-Lib增强',type:'line',data:enh.map(p=>({value:p.equity*(startBase/startEnh||1)})),smooth:true,symbol:'none',
+          lineStyle:{width:2,color:'#f59e0b',type:'dashed'}}]
+    },true);
+  }
+
+  // 诚实对照解读
+  const bm=BT.basic.portfolio.metrics, em=BT.enhanced.portfolio.metrics;
+  const winner = bm.total_return>em.total_return?'基础信号':'TA-Lib增强';
+  $('btInsight').innerHTML=`<b>对照解读：</b>基础信号组合收益 <b>${sign(bm.total_return)}%</b>（夏普 ${bm.sharpe}），
+    叠加 TA-Lib 扩展后为 <b>${sign(em.total_return)}%</b>（夏普 ${em.sharpe}）。本样本中 <b>${winner}</b> 表现更好。
+    ${BT.insight||''} 这提醒我们：<b>指标更多不等于更准</b>，回测存在过拟合与幸存者偏差，历史表现不代表未来。`;
+}
+
 // ============ 交互 ============
 function bind(){
   // 资金离开输入框时规范化到 100 的倍数、下限 100
@@ -372,6 +471,13 @@ function bind(){
     renderSignals();
     render();
     toast('已切换数据源：'+(s==='ths'?'同花顺':'东方财富'));
+  });
+  $('btMode').addEventListener('click',e=>{
+    const m=e.target.dataset.m; if(!m) return;
+    BT_MODE=m;
+    $('btMode').querySelectorAll('button').forEach(b=>b.classList.toggle('sel',b.dataset.m===m));
+    renderBacktest();
+    toast('已切换：'+(m==='basic'?'基础信号':'TA-Lib增强信号'));
   });
   $('calcBtn').addEventListener('click',()=>{render();toast('方案已生成');});
   $('saveBtn').addEventListener('click',()=>{
@@ -408,6 +514,7 @@ document.querySelectorAll('.nav a[href^="#"]').forEach(a=>a.addEventListener('cl
 loadSaved();
 bind();
 renderSignals();
+renderBacktest();
 render();
 </script>
 </body>
